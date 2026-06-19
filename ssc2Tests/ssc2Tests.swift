@@ -6,7 +6,7 @@
 //
 
 import Testing
-@testable import ssc2
+@testable import Simple_Subnet_Calc
 
 // MARK: - IPv4Calculator
 
