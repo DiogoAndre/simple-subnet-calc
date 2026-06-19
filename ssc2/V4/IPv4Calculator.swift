@@ -39,17 +39,19 @@ struct IPv4Calculator {
         let broadcastValue = networkValue | ~mask
         
         // Calculate number of hosts (2^(32-maskBits) - 2)
-        // Subtract 2 for network and broadcast addresses, unless it's a /31 or /32
+        // Subtract 2 for network and broadcast addresses, unless it's a /31 or /32.
+        // /0 is special-cased because (1 << 32) overshifts UInt32 (Swift traps).
         let hostBits = 32 - maskBits
         let numberOfHosts: UInt32
-        
-        if maskBits >= 31 {
-            // Special cases:
-            // /32 - Single host (1 address)
-            // /31 - Point-to-point (RFC 3021) (2 addresses)
-            numberOfHosts = maskBits == 32 ? 1 : 2
-        } else {
-            // Standard case: 2^hostBits - 2
+
+        switch maskBits {
+        case 32:
+            numberOfHosts = 1
+        case 31:
+            numberOfHosts = 2
+        case 0:
+            numberOfHosts = UInt32.max - 1
+        default:
             numberOfHosts = (1 << hostBits) - 2
         }
         

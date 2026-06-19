@@ -200,15 +200,14 @@ struct IPv6SubnetCalculator {
                     result += ":"
                 }
             }
-            
-            // Handle edge cases where :: is at the beginning or end
-            if result.hasPrefix(":") {
+
+            // Leading zero-run produces a single leading ':'; pad to '::'.
+            // Trailing zero-run already ends in '::' from the explicit `result += ":"`
+            // above, so no symmetric fixup is needed (the previous one over-appended).
+            if result.hasPrefix(":") && !result.hasPrefix("::") {
                 result = ":" + result
             }
-            if result.hasSuffix(":") {
-                result = result + ":"
-            }
-            
+
             return result
         } else {
             // No compression, just join the segments

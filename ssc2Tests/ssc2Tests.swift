@@ -161,7 +161,7 @@ struct IPv4CalculatorBugTests {
     ///
     /// Disabled so it documents the expectation without aborting the whole test
     /// run. Re-enable once the host-count math handles `/0`.
-    @Test("/0 default route should report 2^32 - 2 hosts", .disabled("traps on UInt32 underflow; see body"))
+    @Test("/0 default route should report 2^32 - 2 hosts")
     func slash0() throws {
         let info = try IPv4Calculator.calculateSubnet(ipAddress: "10.0.0.1", maskBits: 0)
         #expect(info.networkAddress == "0.0.0.0")
