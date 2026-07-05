@@ -371,6 +371,68 @@ struct IPv6SubnetCalculatorTests {
     }
 }
 
+@Suite("IPv6SubnetCalculator (parser strictness)")
+struct IPv6ParserStrictnessTests {
+
+    let calc = IPv6SubnetCalculator()
+
+    @Test("three consecutive colons before a group is rejected")
+    func tripleColonLeadingRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: ":::1", prefixLength: 64)
+        }
+    }
+
+    @Test("three consecutive colons after a group is rejected")
+    func tripleColonTrailingRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: "1:::", prefixLength: 64)
+        }
+    }
+
+    @Test("three consecutive colons between groups is rejected")
+    func tripleColonMiddleRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: "1:::2", prefixLength: 64)
+        }
+    }
+
+    @Test("a trailing single colon without :: is rejected")
+    func trailingSingleColonRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: "1:2:3:4:5:6:7:", prefixLength: 64)
+        }
+    }
+
+    @Test("a leading single colon without :: is rejected")
+    func leadingSingleColonRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: ":1:2:3:4:5:6:7", prefixLength: 64)
+        }
+    }
+
+    @Test(":: replacing zero groups after eight groups is rejected")
+    func noOpDoubleColonTrailingRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: "1:2:3:4:5:6:7:8::", prefixLength: 64)
+        }
+    }
+
+    @Test(":: replacing zero groups before eight groups is rejected")
+    func noOpDoubleColonLeadingRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: "::1:2:3:4:5:6:7:8", prefixLength: 64)
+        }
+    }
+
+    @Test("a group wider than 16 bits inside a :: address is rejected")
+    func oversizedGroupInDoubleColonRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: "1:2:3:00000::", prefixLength: 64)
+        }
+    }
+}
+
 // MARK: - IPv6SubnetCalculator known bugs
 
 @Suite("IPv6SubnetCalculator (documented bugs)")
