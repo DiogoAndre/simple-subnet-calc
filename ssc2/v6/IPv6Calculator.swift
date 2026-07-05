@@ -76,7 +76,9 @@ struct IPv6SubnetCalculator {
         if let percentIndex = ipAddress.firstIndex(of: "%") {
             ipAddress = String(ipAddress[..<percentIndex])
         }
-        
+
+        ipAddress = ipAddress.lowercased()
+
         // Handle IPv4-mapped addresses
         if ipAddress.contains(".") {
             throw SubnetError.ipv4MappedAddressesNotSupported

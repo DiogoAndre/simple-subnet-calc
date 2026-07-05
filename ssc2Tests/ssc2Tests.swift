@@ -240,6 +240,13 @@ struct IPv6SubnetCalculatorTests {
         #expect(info.expandedAddress == "2001:0db8:85a3:0000:0000:8a2e:0370:7334")
     }
 
+    @Test("uppercase input is lowercased per RFC 5952")
+    func lowercasesUppercaseInput() throws {
+        let info = try calc.calculateSubnet(address: "2001:DB8::1", prefixLength: 128)
+        #expect(info.compressedAddress == "2001:db8::1")
+        #expect(info.expandedAddress == "2001:0db8:0000:0000:0000:0000:0000:0001")
+    }
+
     // MARK: Compression (cases the algorithm handles correctly)
 
     @Test("compresses a middle run of zeros")
