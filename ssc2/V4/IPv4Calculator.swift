@@ -68,22 +68,34 @@ struct IPv4Calculator {
     /// - Returns: UInt32 representation of the IP address
     /// - Throws: An error if the IP address is invalid
     private static func convertIPToUInt32(_ ipAddress: String) throws -> UInt32 {
-        let octets = ipAddress.split(separator: ".")
-        
+        let octets = ipAddress.split(separator: ".", omittingEmptySubsequences: false)
+
         guard octets.count == 4 else {
             throw IPv4Error.invalidIPFormat
         }
-        
+
         var result: UInt32 = 0
-        
+
         for (index, octetString) in octets.enumerated() {
+            guard octetString.count >= 1 && octetString.count <= 3 else {
+                throw IPv4Error.invalidOctet
+            }
+
+            guard octetString.allSatisfy({ $0.isASCII && $0.isNumber }) else {
+                throw IPv4Error.invalidOctet
+            }
+
+            guard octetString == "0" || octetString.first != "0" else {
+                throw IPv4Error.invalidOctet
+            }
+
             guard let octet = UInt8(octetString) else {
                 throw IPv4Error.invalidOctet
             }
-            
+
             result = result | (UInt32(octet) << (8 * (3 - index)))
         }
-        
+
         return result
     }
     
