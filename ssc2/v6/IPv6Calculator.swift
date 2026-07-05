@@ -76,7 +76,9 @@ struct IPv6SubnetCalculator {
         if let percentIndex = ipAddress.firstIndex(of: "%") {
             ipAddress = String(ipAddress[..<percentIndex])
         }
-        
+
+        ipAddress = ipAddress.lowercased()
+
         // Handle IPv4-mapped addresses
         if ipAddress.contains(".") {
             throw SubnetError.ipv4MappedAddressesNotSupported
@@ -92,47 +94,59 @@ struct IPv6SubnetCalculator {
         
         if parts.count == 2 {
             // Handle the case with "::"
-            var leftParts = parts[0].isEmpty ? [] : parts[0].components(separatedBy: ":")
-            var rightParts = parts[1].isEmpty ? [] : parts[1].components(separatedBy: ":")
-            
+            let leftParts = parts[0].isEmpty ? [] : parts[0].components(separatedBy: ":")
+            let rightParts = parts[1].isEmpty ? [] : parts[1].components(separatedBy: ":")
+
+            guard !leftParts.contains("") && !rightParts.contains("") else {
+                throw SubnetError.invalidAddress
+            }
+
+            guard leftParts.allSatisfy({ $0.count <= 4 }) && rightParts.allSatisfy({ $0.count <= 4 }) else {
+                throw SubnetError.invalidAddress
+            }
+
             // Calculate how many groups we need to add
             let totalGroups = 8
             let missingGroups = totalGroups - leftParts.count - rightParts.count
-            
-            guard missingGroups >= 0 else {
+
+            guard missingGroups > 0 else {
                 throw SubnetError.invalidAddress
             }
-            
+
             // Build full parts array with zeroes for the compressed section
             var fullParts = leftParts
             fullParts.append(contentsOf: Array(repeating: "0000", count: missingGroups))
             fullParts.append(contentsOf: rightParts)
-            
+
             // Ensure each part is 4 characters by padding with leading zeroes
             let expandedParts = fullParts.map { part in
                 let paddedPart = String(repeating: "0", count: max(0, 4 - part.count)) + part
                 return paddedPart
             }
-            
+
             guard expandedParts.count == 8 else {
                 throw SubnetError.invalidAddress
             }
-            
+
             return expandedParts.joined(separator: ":")
         } else {
             // Handle the case without "::"
             let segments = ipAddress.components(separatedBy: ":")
-            
+
             guard segments.count == 8 else {
                 throw SubnetError.invalidAddress
             }
-            
+
+            guard segments.allSatisfy({ !$0.isEmpty && $0.count <= 4 }) else {
+                throw SubnetError.invalidAddress
+            }
+
             // Ensure each part is 4 characters
             let expandedParts = segments.map { part in
                 let paddedPart = String(repeating: "0", count: max(0, 4 - part.count)) + part
                 return paddedPart
             }
-            
+
             return expandedParts.joined(separator: ":")
         }
     }

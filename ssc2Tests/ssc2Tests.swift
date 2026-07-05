@@ -145,6 +145,54 @@ struct IPv4CalculatorTests {
             try IPv4Calculator.calculateSubnet(ipAddress: "192.168.1.abc", maskBits: 24)
         }
     }
+
+    @Test("a leading zero on an octet is rejected")
+    func octetLeadingZero() {
+        #expect(throws: IPv4Calculator.IPv4Error.invalidOctet) {
+            try IPv4Calculator.calculateSubnet(ipAddress: "192.168.010.1", maskBits: 24)
+        }
+    }
+
+    @Test("a plus-signed octet is rejected")
+    func octetPlusSign() {
+        #expect(throws: IPv4Calculator.IPv4Error.invalidOctet) {
+            try IPv4Calculator.calculateSubnet(ipAddress: "192.168.+1.1", maskBits: 24)
+        }
+    }
+
+    @Test("a minus-signed octet is rejected")
+    func octetMinusSign() {
+        #expect(throws: IPv4Calculator.IPv4Error.invalidOctet) {
+            try IPv4Calculator.calculateSubnet(ipAddress: "192.168.-0.1", maskBits: 24)
+        }
+    }
+
+    @Test("an empty octet is rejected")
+    func octetEmpty() {
+        #expect(throws: IPv4Calculator.IPv4Error.invalidOctet) {
+            try IPv4Calculator.calculateSubnet(ipAddress: "192..168.1", maskBits: 24)
+        }
+    }
+
+    // MARK: Canonical zero octets
+
+    @Test("a bare zero octet still parses")
+    func octetBareZero() throws {
+        let info = try IPv4Calculator.calculateSubnet(ipAddress: "10.0.0.0", maskBits: 24)
+        #expect(info.networkAddress == "10.0.0.0")
+        #expect(info.broadcastAddress == "10.0.0.255")
+        #expect(info.subnetMask == "255.255.255.0")
+        #expect(info.numberOfHosts == 254)
+    }
+
+    @Test("the maximum octet value still parses")
+    func octetMaxValue() throws {
+        let info = try IPv4Calculator.calculateSubnet(ipAddress: "255.255.255.255", maskBits: 32)
+        #expect(info.networkAddress == "255.255.255.255")
+        #expect(info.broadcastAddress == "255.255.255.255")
+        #expect(info.subnetMask == "255.255.255.255")
+        #expect(info.numberOfHosts == 1)
+    }
 }
 
 // MARK: - IPv4Calculator known bugs
@@ -190,6 +238,13 @@ struct IPv6SubnetCalculatorTests {
     func expandsFullAddress() throws {
         let info = try calc.calculateSubnet(address: "2001:db8:85a3:0:0:8a2e:370:7334", prefixLength: 128)
         #expect(info.expandedAddress == "2001:0db8:85a3:0000:0000:8a2e:0370:7334")
+    }
+
+    @Test("uppercase input is lowercased per RFC 5952")
+    func lowercasesUppercaseInput() throws {
+        let info = try calc.calculateSubnet(address: "2001:DB8::1", prefixLength: 128)
+        #expect(info.compressedAddress == "2001:db8::1")
+        #expect(info.expandedAddress == "2001:0db8:0000:0000:0000:0000:0000:0001")
     }
 
     // MARK: Compression (cases the algorithm handles correctly)
@@ -319,6 +374,68 @@ struct IPv6SubnetCalculatorTests {
     func oversizedGroupRejected() {
         #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
             try calc.calculateSubnet(address: "12345::", prefixLength: 64)
+        }
+    }
+}
+
+@Suite("IPv6SubnetCalculator (parser strictness)")
+struct IPv6ParserStrictnessTests {
+
+    let calc = IPv6SubnetCalculator()
+
+    @Test("three consecutive colons before a group is rejected")
+    func tripleColonLeadingRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: ":::1", prefixLength: 64)
+        }
+    }
+
+    @Test("three consecutive colons after a group is rejected")
+    func tripleColonTrailingRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: "1:::", prefixLength: 64)
+        }
+    }
+
+    @Test("three consecutive colons between groups is rejected")
+    func tripleColonMiddleRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: "1:::2", prefixLength: 64)
+        }
+    }
+
+    @Test("a trailing single colon without :: is rejected")
+    func trailingSingleColonRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: "1:2:3:4:5:6:7:", prefixLength: 64)
+        }
+    }
+
+    @Test("a leading single colon without :: is rejected")
+    func leadingSingleColonRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: ":1:2:3:4:5:6:7", prefixLength: 64)
+        }
+    }
+
+    @Test(":: replacing zero groups after eight groups is rejected")
+    func noOpDoubleColonTrailingRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: "1:2:3:4:5:6:7:8::", prefixLength: 64)
+        }
+    }
+
+    @Test(":: replacing zero groups before eight groups is rejected")
+    func noOpDoubleColonLeadingRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: "::1:2:3:4:5:6:7:8", prefixLength: 64)
+        }
+    }
+
+    @Test("a group wider than 16 bits inside a :: address is rejected")
+    func oversizedGroupInDoubleColonRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: "1:2:3:00000::", prefixLength: 64)
         }
     }
 }
