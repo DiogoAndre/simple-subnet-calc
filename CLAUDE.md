@@ -10,7 +10,7 @@ Native SwiftUI subnet calculator for IPv4 and IPv6. Ships on the App Store; iOS 
   xcodebuild -project "Simple Subnet Calc.xcodeproj" -scheme ssc2 \
     -destination 'platform=iOS Simulator,name=iPhone 15' build
   ```
-- Tests (`ssc2Tests`, `ssc2UITests`) are scaffolding only — no real coverage yet.
+- `ssc2Tests` is a real 77-test suite pinning the calculators' behavior (run via ⌘U in Xcode). It also runs without Xcode through `linux-test-harness/` (`cd linux-test-harness && swift test`) — the harness symlinks the app sources, so it never drifts. In Claude Code on the web, `.claude/hooks/session-start.sh` installs the Swift toolchain and pre-builds the harness at session start. `ssc2UITests` is still scaffolding.
 
 ## Layout
 
