@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		036A31872E1B2C3D0021F5BA /* CIDR in Frameworks */ = {isa = PBXBuildFile; productRef = 036A31882E1B2C3D0021F5BA /* CIDR */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		036A316B2DA6407F0021F5BA /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				036A31872E1B2C3D0021F5BA /* CIDR in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = "Simple Subnet Calc";
 			packageProductDependencies = (
+				036A31882E1B2C3D0021F5BA /* CIDR */,
 			);
 			productName = ssc2;
 			productReference = 036A315C2DA6407E0021F5BA /* Simple Subnet Calc.app */;
@@ -195,6 +201,9 @@
 			);
 			mainGroup = 036A31532DA6407E0021F5BA;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				036A31892E1B2C3D0021F5BA /* XCRemoteSwiftPackageReference "swift-cidr" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 036A315D2DA6407E0021F5BA /* Products */;
 			projectDirPath = "";
@@ -603,6 +612,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		036A31892E1B2C3D0021F5BA /* XCRemoteSwiftPackageReference "swift-cidr" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RouteObjects/swift-cidr.git";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 0.2.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		036A31882E1B2C3D0021F5BA /* CIDR */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 036A31892E1B2C3D0021F5BA /* XCRemoteSwiftPackageReference "swift-cidr" */;
+			productName = CIDR;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 036A31542DA6407E0021F5BA /* Project object */;
 }
