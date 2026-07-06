@@ -71,6 +71,24 @@ struct IPv4CalculatorTests {
         #expect(info.numberOfHosts == 2)
     }
 
+    @Test("/2 quarter of the address space (general host-count formula)")
+    func slash2() throws {
+        let info = try IPv4Calculator.calculateSubnet(ipAddress: "130.5.6.7", maskBits: 2)
+        #expect(info.networkAddress == "128.0.0.0")
+        #expect(info.broadcastAddress == "191.255.255.255")
+        #expect(info.subnetMask == "192.0.0.0")
+        #expect(info.numberOfHosts == 1_073_741_822)
+    }
+
+    @Test("/3 eighth of the address space (general host-count formula)")
+    func slash3() throws {
+        let info = try IPv4Calculator.calculateSubnet(ipAddress: "130.5.6.7", maskBits: 3)
+        #expect(info.networkAddress == "128.0.0.0")
+        #expect(info.broadcastAddress == "159.255.255.255")
+        #expect(info.subnetMask == "224.0.0.0")
+        #expect(info.numberOfHosts == 536_870_910)
+    }
+
     // MARK: Special-case masks
 
     @Test("/31 point-to-point link (RFC 3021) has 2 usable addresses")
@@ -98,6 +116,15 @@ struct IPv4CalculatorTests {
         #expect(info.broadcastAddress == "127.255.255.255")
         #expect(info.subnetMask == "128.0.0.0")
         #expect(info.numberOfHosts == 2_147_483_646)
+    }
+
+    @Test("/0 default route reports 2^32 - 2 hosts")
+    func slash0() throws {
+        let info = try IPv4Calculator.calculateSubnet(ipAddress: "10.0.0.1", maskBits: 0)
+        #expect(info.networkAddress == "0.0.0.0")
+        #expect(info.broadcastAddress == "255.255.255.255")
+        #expect(info.subnetMask == "0.0.0.0")
+        #expect(info.numberOfHosts == 4_294_967_294)
     }
 
     // MARK: Invalid mask bits
@@ -146,10 +173,31 @@ struct IPv4CalculatorTests {
         }
     }
 
+    @Test("an octet with four digits is rejected")
+    func octetTooManyDigits() {
+        #expect(throws: IPv4Calculator.IPv4Error.invalidOctet) {
+            try IPv4Calculator.calculateSubnet(ipAddress: "1000.1.1.1", maskBits: 24)
+        }
+    }
+
+    @Test("a four-digit octet with a leading zero is rejected")
+    func octetFourDigitsLeadingZero() {
+        #expect(throws: IPv4Calculator.IPv4Error.invalidOctet) {
+            try IPv4Calculator.calculateSubnet(ipAddress: "0100.1.1.1", maskBits: 24)
+        }
+    }
+
     @Test("a leading zero on an octet is rejected")
     func octetLeadingZero() {
         #expect(throws: IPv4Calculator.IPv4Error.invalidOctet) {
             try IPv4Calculator.calculateSubnet(ipAddress: "192.168.010.1", maskBits: 24)
+        }
+    }
+
+    @Test("a zero octet written as \"00\" is rejected")
+    func octetDoubleZero() {
+        #expect(throws: IPv4Calculator.IPv4Error.invalidOctet) {
+            try IPv4Calculator.calculateSubnet(ipAddress: "192.168.00.1", maskBits: 24)
         }
     }
 
@@ -174,6 +222,27 @@ struct IPv4CalculatorTests {
         }
     }
 
+    @Test("leading whitespace is rejected")
+    func leadingWhitespaceRejected() {
+        #expect(throws: IPv4Calculator.IPv4Error.invalidOctet) {
+            try IPv4Calculator.calculateSubnet(ipAddress: " 192.168.1.1", maskBits: 24)
+        }
+    }
+
+    @Test("trailing whitespace is rejected")
+    func trailingWhitespaceRejected() {
+        #expect(throws: IPv4Calculator.IPv4Error.invalidOctet) {
+            try IPv4Calculator.calculateSubnet(ipAddress: "192.168.1.1 ", maskBits: 24)
+        }
+    }
+
+    @Test("a CIDR suffix in the address field is rejected")
+    func cidrSuffixRejected() {
+        #expect(throws: IPv4Calculator.IPv4Error.invalidOctet) {
+            try IPv4Calculator.calculateSubnet(ipAddress: "192.168.1.1/24", maskBits: 24)
+        }
+    }
+
     // MARK: Canonical zero octets
 
     @Test("a bare zero octet still parses")
@@ -192,30 +261,6 @@ struct IPv4CalculatorTests {
         #expect(info.broadcastAddress == "255.255.255.255")
         #expect(info.subnetMask == "255.255.255.255")
         #expect(info.numberOfHosts == 1)
-    }
-}
-
-// MARK: - IPv4Calculator known bugs
-
-@Suite("IPv4Calculator (documented bugs)")
-struct IPv4CalculatorBugTests {
-
-    /// DOCUMENTED BUG — currently traps instead of returning a value.
-    ///
-    /// For a /0 mask `hostBits == 32`, and `numberOfHosts = (1 << hostBits) - 2`
-    /// is evaluated as `UInt32`. `UInt32(1) << 32` smart-shifts to `0`, then
-    /// `0 - 2` underflows and crashes the process. A correct implementation
-    /// should report 4,294,967,294 usable hosts for `0.0.0.0/0`.
-    ///
-    /// Disabled so it documents the expectation without aborting the whole test
-    /// run. Re-enable once the host-count math handles `/0`.
-    @Test("/0 default route should report 2^32 - 2 hosts")
-    func slash0() throws {
-        let info = try IPv4Calculator.calculateSubnet(ipAddress: "10.0.0.1", maskBits: 0)
-        #expect(info.networkAddress == "0.0.0.0")
-        #expect(info.broadcastAddress == "255.255.255.255")
-        #expect(info.subnetMask == "0.0.0.0")
-        #expect(info.numberOfHosts == 4_294_967_294)
     }
 }
 
@@ -247,7 +292,33 @@ struct IPv6SubnetCalculatorTests {
         #expect(info.expandedAddress == "2001:0db8:0000:0000:0000:0000:0000:0001")
     }
 
-    // MARK: Compression (cases the algorithm handles correctly)
+    @Test("groups with leading zeros in the input parse fine")
+    func leadingZeroGroupsParse() throws {
+        let info = try calc.calculateSubnet(address: "2001:0db8::1", prefixLength: 128)
+        #expect(info.compressedAddress == "2001:db8::1")
+        #expect(info.expandedAddress == "2001:0db8:0000:0000:0000:0000:0000:0001")
+    }
+
+    // MARK: Zone indices
+
+    @Test("a zone index is stripped before parsing")
+    func zoneIndexStripped() throws {
+        let info = try calc.calculateSubnet(address: "fe80::1%en0", prefixLength: 64)
+        #expect(info.compressedAddress == "fe80::1")
+        #expect(info.expandedAddress == "fe80:0000:0000:0000:0000:0000:0000:0001")
+        #expect(info.subnetPrefix == "fe80::/64")
+        #expect(info.firstAddress == "fe80::")
+        #expect(info.lastAddress == "fe80::ffff:ffff:ffff:ffff")
+    }
+
+    @Test("a bare percent sign with an empty zone is stripped too")
+    func emptyZoneIndexStripped() throws {
+        let info = try calc.calculateSubnet(address: "fe80::1%", prefixLength: 64)
+        #expect(info.compressedAddress == "fe80::1")
+        #expect(info.subnetPrefix == "fe80::/64")
+    }
+
+    // MARK: Compression (RFC 5952)
 
     @Test("compresses a middle run of zeros")
     func compressesMiddleZeroRun() throws {
@@ -261,6 +332,40 @@ struct IPv6SubnetCalculatorTests {
         #expect(info.compressedAddress == "::1")
     }
 
+    @Test("compresses a trailing run of zeros")
+    func compressesTrailingZeroRun() throws {
+        let info = try calc.calculateSubnet(address: "2001:db8::", prefixLength: 64)
+        #expect(info.compressedAddress == "2001:db8::")
+    }
+
+    @Test("the all-zeros unspecified address compresses to ::")
+    func compressesUnspecifiedAddress() throws {
+        let info = try calc.calculateSubnet(address: "::", prefixLength: 0)
+        #expect(info.compressedAddress == "::")
+        #expect(info.expandedAddress == "0000:0000:0000:0000:0000:0000:0000:0000")
+        #expect(info.subnetPrefix == "::/0")
+        #expect(info.firstAddress == "::")
+        #expect(info.lastAddress == "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
+    }
+
+    @Test("a single zero group is not compressed (RFC 5952 §4.2.2)")
+    func singleZeroGroupNotCompressed() throws {
+        let info = try calc.calculateSubnet(address: "2001:db8:0:1:1:1:1:1", prefixLength: 128)
+        #expect(info.compressedAddress == "2001:db8:0:1:1:1:1:1")
+    }
+
+    @Test("when two zero runs tie in length, the first is compressed (RFC 5952 §4.2.3)")
+    func tiedZeroRunsCompressFirst() throws {
+        let info = try calc.calculateSubnet(address: "1:0:0:2:0:0:3:4", prefixLength: 128)
+        #expect(info.compressedAddress == "1::2:0:0:3:4")
+    }
+
+    @Test("the longest zero run wins regardless of position")
+    func longestZeroRunWins() throws {
+        let info = try calc.calculateSubnet(address: "2001:0:0:1:0:0:0:1", prefixLength: 128)
+        #expect(info.compressedAddress == "2001:0:0:1::1")
+    }
+
     // MARK: Network / first / last addresses
 
     @Test("last address fills the host bits with ones")
@@ -269,16 +374,59 @@ struct IPv6SubnetCalculatorTests {
         #expect(info.lastAddress == "2001:db8::ffff:ffff:ffff:ffff")
     }
 
+    @Test("first address of a /64 is the network address")
+    func firstAddressOfSlash64() throws {
+        let info = try calc.calculateSubnet(address: "2001:db8::", prefixLength: 64)
+        #expect(info.firstAddress == "2001:db8::")
+    }
+
     @Test("first address of a /128 is the address itself")
     func firstAddressOfSlash128() throws {
         let info = try calc.calculateSubnet(address: "2001:db8:85a3:0:0:8a2e:370:7334", prefixLength: 128)
         #expect(info.firstAddress == "2001:db8:85a3::8a2e:370:7334")
     }
 
+    @Test("a /127 covers exactly two addresses")
+    func slash127Edges() throws {
+        let info = try calc.calculateSubnet(address: "2001:db8::1", prefixLength: 127)
+        #expect(info.subnetPrefix == "2001:db8::/127")
+        #expect(info.firstAddress == "2001:db8::")
+        #expect(info.lastAddress == "2001:db8::1")
+        #expect(info.totalHosts == "2.00000e+00")
+    }
+
+    @Test("a /1 splits the address space on the top bit")
+    func slash1Edges() throws {
+        let lower = try calc.calculateSubnet(address: "2001:db8::", prefixLength: 1)
+        #expect(lower.subnetPrefix == "::/1")
+        #expect(lower.firstAddress == "::")
+        #expect(lower.lastAddress == "7fff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
+
+        let upper = try calc.calculateSubnet(address: "a000::", prefixLength: 1)
+        #expect(upper.subnetPrefix == "8000::/1")
+        #expect(upper.firstAddress == "8000::")
+        #expect(upper.lastAddress == "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
+    }
+
     @Test("subnet prefix of a /128 keeps the full address")
     func subnetPrefixOfSlash128() throws {
         let info = try calc.calculateSubnet(address: "2001:db8:85a3:0:0:8a2e:370:7334", prefixLength: 128)
         #expect(info.subnetPrefix == "2001:db8:85a3::8a2e:370:7334/128")
+    }
+
+    @Test("subnet prefix of a /48 compresses correctly")
+    func subnetPrefixOfSlash48() throws {
+        let info = try calc.calculateSubnet(address: "2001:db8:85a3::8a2e:370:7334", prefixLength: 48)
+        #expect(info.subnetPrefix == "2001:db8:85a3::/48")
+    }
+
+    @Test("a /61 truncates the network mid-group")
+    func subnetPrefixOfSlash61() throws {
+        let info = try calc.calculateSubnet(address: "2001:db8:0:f::", prefixLength: 61)
+        #expect(info.subnetPrefix == "2001:db8:0:8::/61")
+        #expect(info.firstAddress == "2001:db8:0:8::")
+        #expect(info.lastAddress == "2001:db8:0:f:ffff:ffff:ffff:ffff")
+        #expect(info.numberOfSlash64Networks == "8")
     }
 
     // MARK: /64-network counts
@@ -296,14 +444,20 @@ struct IPv6SubnetCalculatorTests {
         #expect(info.numberOfSlash64Networks == "65536")
     }
 
-    // NOTE: The scientific-notation expectations below depend on `String(format:)`
-    // behaviour. They are deterministic for powers of two but are the most
-    // platform-sensitive assertions in this suite — verify in Xcode.
+    // NOTE: The scientific-notation expectations below come from
+    // `String(format:)` with power-of-two inputs, so they are deterministic;
+    // the exact strings are pinned by these tests on both Darwin and Linux.
 
     @Test("a /32 reports its /64 count in scientific notation")
     func slash64NetworkCountLarge() throws {
         let info = try calc.calculateSubnet(address: "2001:db8::", prefixLength: 32)
         #expect(info.numberOfSlash64Networks == "4.29497e+09")
+    }
+
+    @Test("a /0 reports its /64 count in scientific notation")
+    func slash64NetworkCountSlash0() throws {
+        let info = try calc.calculateSubnet(address: "::", prefixLength: 0)
+        #expect(info.numberOfSlash64Networks == "1.84467e+19")
     }
 
     // MARK: Total host counts (always scientific notation)
@@ -378,6 +532,8 @@ struct IPv6SubnetCalculatorTests {
     }
 }
 
+// MARK: - IPv6SubnetCalculator parser strictness
+
 @Suite("IPv6SubnetCalculator (parser strictness)")
 struct IPv6ParserStrictnessTests {
 
@@ -418,6 +574,13 @@ struct IPv6ParserStrictnessTests {
         }
     }
 
+    @Test("a dangling single colon after a :: form is rejected")
+    func danglingColonAfterDoubleColonRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: "1::2:", prefixLength: 64)
+        }
+    }
+
     @Test(":: replacing zero groups after eight groups is rejected")
     func noOpDoubleColonTrailingRejected() {
         #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
@@ -432,49 +595,40 @@ struct IPv6ParserStrictnessTests {
         }
     }
 
+    @Test(":: replacing zero groups between eight groups is rejected")
+    func noOpDoubleColonMiddleRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: "1:2:3:4:5:6:7::8", prefixLength: 64)
+        }
+    }
+
     @Test("a group wider than 16 bits inside a :: address is rejected")
     func oversizedGroupInDoubleColonRejected() {
         #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
             try calc.calculateSubnet(address: "1:2:3:00000::", prefixLength: 64)
         }
     }
-}
 
-// MARK: - IPv6SubnetCalculator known bugs
-
-@Suite("IPv6SubnetCalculator (documented bugs)")
-struct IPv6SubnetCalculatorBugTests {
-
-    let calc = IPv6SubnetCalculator()
-
-    // DOCUMENTED BUG — trailing-zero compression adds an extra colon.
-    //
-    // In `compressIPv6Address`, after the longest zero-run that reaches the end
-    // of the address has been replaced with "::", the final
-    // `if result.hasSuffix(":") { result = result + ":" }` fix-up appends one
-    // colon too many. As a result an address whose longest zero-run is at the
-    // end compresses to three trailing colons (e.g. "2001:db8:::").
-    //
-    // These assertions encode the RFC 5952 correct output, so they currently
-    // FAIL. They should pass once the trailing/leading fix-up logic is fixed.
-    // Because subnet network addresses usually end in zeros, this also affects
-    // `subnetPrefix` and `firstAddress`.
-
-    @Test("compresses a trailing run of zeros without an extra colon")
-    func compressesTrailingZeroRun() throws {
-        let info = try calc.calculateSubnet(address: "2001:db8::", prefixLength: 64)
-        #expect(info.compressedAddress == "2001:db8::")
+    @Test("a CIDR suffix in the address field is rejected")
+    func cidrSuffixRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: "2001:db8::/64", prefixLength: 64)
+        }
     }
 
-    @Test("subnet prefix of a /48 compresses correctly")
-    func subnetPrefixOfSlash48() throws {
-        let info = try calc.calculateSubnet(address: "2001:db8:85a3::8a2e:370:7334", prefixLength: 48)
-        #expect(info.subnetPrefix == "2001:db8:85a3::/48")
-    }
-
-    @Test("first address of a /64 compresses correctly")
-    func firstAddressOfSlash64() throws {
-        let info = try calc.calculateSubnet(address: "2001:db8::", prefixLength: 64)
-        #expect(info.firstAddress == "2001:db8::")
+    @Test("whitespace around the address is rejected")
+    func whitespaceRejected() {
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: " 2001:db8::", prefixLength: 64)
+        }
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: "2001:db8:: ", prefixLength: 64)
+        }
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: "2001:db8::1 ", prefixLength: 64)
+        }
+        #expect(throws: IPv6SubnetCalculator.SubnetError.invalidAddress) {
+            try calc.calculateSubnet(address: " ::1", prefixLength: 64)
+        }
     }
 }
